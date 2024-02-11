@@ -1,0 +1,174 @@
+blueprint:
+    name: Philips Hue Tap Dial Switch for Lighting
+    description: Control lights with a Philips Hue Tap Dial (RDM002) connected via ZHA. Run custom lighting actions with the four buttons, and dim the most recently used light(s) using the dial.
+    domain: automation
+    input:
+        remote:
+            name: Philips Hue Tap Dial Device
+            description: Choose the device to use for this automation
+            selector:
+                device:
+                    integration: zha
+                    manufacturer: Signify Netherlands B.V.
+                    model: RDM002
+                    multiple: false
+        button_1:
+            name: Button 1 Press
+            description: Choose the action(s) to run after pressing button 1
+            selector:
+                action: {}
+        dim_1:
+            name: Button 1 Dimming
+            description: Choose the light(s) to dim after pressing button 1
+            selector:
+                target:
+                    entity: {}
+        button_2:
+            name: Button 2 Press
+            description: Choose the action(s) to run after pressing button 2
+            selector:
+                action: {}
+        dim_2:
+            name: Button 2 Dimming
+            description: Choose the light(s) to dim after pressing button 2
+            selector:
+                target:
+                    entity: {}
+        button_3:
+            name: Button 3 Press
+            description: Choose the action(s) to run after pressing button 3
+            selector:
+                action: {}
+        dim_3:
+            name: Button 3 Dimming
+            description: Choose the light(s) to dim after pressing button 3
+            selector:
+                target:
+                    entity: {}
+        button_4:
+            name: Button 4 Press
+            description: Choose the action(s) to run after pressing button 4
+            selector:
+                action: {}
+        dim_4:
+            name: Button 4 Dimming
+            description: Choose the light(s) to dim after pressing button 4
+            selector:
+                target:
+                    entity: {}
+        current_light:
+            name: Current Light
+            description: Select a Text Helper to track the current light(s) to dim
+            selector:
+                entity:
+                    domain: input_text
+        dim_scale:
+            name: Dimming Scale
+            description: Set the scale factor for dimming. A lower number will result in more gradual dimming, while a larger number will result in faster dimming.
+            default: 1.0
+            selector:
+                number:
+                    min: 0.0
+                    max: 5.0
+                    step: 0.01
+mode: restart
+max_exceeded: silent
+variables:
+    dim_1: !input dim_1
+    dim_2: !input dim_2
+    dim_3: !input dim_3
+    dim_4: !input dim_4
+    current_light: !input current_light
+    dim_scale: !input dim_scale
+    lights:
+        dim_1: !input dim_1
+        dim_2: !input dim_2
+        dim_3: !input dim_3
+        dim_4: !input dim_4
+    event: '{{ trigger.event.data.command }}'
+    args: '{% if (trigger.event.data.args is defined) %}{{trigger.event.data.args}}{% endif %}'
+    params: '{% if (trigger.event.data.params is defined) %}{{trigger.event.data.params}}{% endif %}'
+    step_size: '{% if (trigger.event.data.params is defined) and (trigger.event.data.params.step_size is defined) %}{{trigger.event.data.params.step_size}}{% endif %}'
+    step_mode: '{% if (trigger.event.data.params is defined) and (trigger.event.data.params.step_mode is defined) %}{{trigger.event.data.params.step_mode}}{% endif %}'
+    scene: "{{ trigger.event.data.args[1] }}"
+trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+        device_id: !input remote
+action:
+  - choose:
+    # Buttons
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 1 }}'
+        sequence: !input button_1
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 0 }}'
+        sequence: !input button_2
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 5 }}'
+        sequence: !input button_3
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 4 }}'
+        sequence: !input button_4
+    # Dimming
+      - conditions:
+          - "{{ event == 'step_with_on_off' }}"
+          - "{{ step_mode == 'StepMode.Up' }}"
+        sequence:
+          - service: light.turn_on
+            target: "{{ lights[states(current_light)] }}"
+            data:
+                brightness_step_pct: "{{ step_size * dim_scale }}"
+                transition: 1
+      - conditions:
+          - "{{ event == 'step_with_on_off' }}"
+          - "{{ step_mode == 'StepMode.Down' }}"
+        sequence:
+          - service: light.turn_on
+            target: "{{ lights[states(current_light)] }}"
+            data:
+                brightness_step_pct: "{{ -step_size * dim_scale }}"
+                transition: 1
+  - choose:
+    # Last used light state
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 1 }}'
+        sequence:
+          - service: input_text.set_value
+            target:
+                entity_id: !input "current_light"
+            data:
+                value: dim_1
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 0 }}'
+        sequence:
+          - service: input_text.set_value
+            target:
+                entity_id: !input "current_light"
+            data:
+                value: dim_2
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 5 }}'
+        sequence:
+          - service: input_text.set_value
+            target:
+                entity_id: !input "current_light"
+            data:
+                value: dim_3
+      - conditions:
+          - '{{ event == "recall" }}'
+          - '{{ scene == 4 }}'
+        sequence:
+          - service: input_text.set_value
+            target:
+                entity_id: !input "current_light"
+            data:
+                value: dim_4
